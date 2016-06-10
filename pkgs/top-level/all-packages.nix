@@ -6253,6 +6253,8 @@ in
 
   jamomacore = callPackage ../development/libraries/audio/jamomacore { };
 
+  jgraphx = callPackage ../development/libraries/java/jgraphx { };
+
   jikespg = callPackage ../development/tools/parsing/jikespg { };
 
   jenkins = callPackage ../development/tools/continuous-integration/jenkins { };
