@@ -6154,6 +6154,8 @@ in
 
   foreman = callPackage ../tools/system/foreman { };
 
+  flexdock = callPackage ../development/libraries/java/flexdock { };
+
   flow = callPackage ../development/tools/analysis/flow {
     inherit (darwin.apple_sdk.frameworks) CoreServices;
     inherit (darwin) cf-private;
