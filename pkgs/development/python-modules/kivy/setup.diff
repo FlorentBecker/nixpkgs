@@ -1,0 +1,22 @@
+diff --git a/setup.py b/setup.py
+index 46e6ea8..3705a77 100644
+--- a/setup.py
++++ b/setup.py
+@@ -611,14 +611,14 @@ def determine_sdl2():
+         sdl_inc = join(dirname(sys.executable), 'include', 'SDL2')
+         if isdir(sdl_inc):
+             sdl2_paths = [sdl_inc]
+-        sdl2_paths.extend(['/usr/local/include/SDL2', '/usr/include/SDL2'])
++        sdl2_paths.extend(['/usr/local', '/usr'])
+ 
+-    flags['include_dirs'] = sdl2_paths
++    flags['include_dirs'] = [ join(p, 'include', 'SDL2') for p in sdl2_paths]
+ 
+     flags['extra_link_args'] = []
+     flags['extra_compile_args'] = []
+     flags['extra_link_args'] += (
+-        ['-L' + p for p in sdl2_paths] if sdl2_paths else
++        ['-L' + join(p, 'lib') for p in sdl2_paths] if sdl2_paths else
+         ['-L/usr/local/lib/'])
+ 
+     # ensure headers for all the SDL2 and sub libraries are available

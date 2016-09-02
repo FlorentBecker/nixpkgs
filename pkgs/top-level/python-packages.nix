@@ -12559,6 +12559,20 @@ in modules // {
     };
   });
 
+  kivy = callPackage ../development/python-modules/kivy {};
+
+  kivy-garden = buildPythonPackage {
+    name = "Kivy-Garden-0.1.4";
+
+    propagatedBuildInputs = [ self.requests2 ];
+
+    src = pkgs.fetchurl {
+       url = "https://pypi.python.org/packages/7d/68/decaee596ff8168a39432eb3949fc7c0be952ebb9467806823bffc165d48/kivy-garden-0.1.4.tar.gz";
+       sha256 = "0wkcpr2zc1q5jb0bi7v2dgc0vs5h1y7j42mviyh764j2i0kz8mn2";
+    };
+
+  };
+
   pylast = buildPythonPackage rec {
     name = "pylast-${version}";
     version = "0.5.11";
