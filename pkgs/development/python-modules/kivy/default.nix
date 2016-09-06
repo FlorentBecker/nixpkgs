@@ -18,4 +18,17 @@ buildPythonPackage {
     };
 
     doCheck = false;   
+
+  meta = with stdenv.lib; {
+    homepage = "http://kivy.org";
+
+    description = ''
+      Open source Python library for rapid development of
+      applications that make use of innovative user interfaces, such as
+      multi-touch apps.
+    '';
+
+     license = with licenses; [ MIT ];
+  }
+
 }
