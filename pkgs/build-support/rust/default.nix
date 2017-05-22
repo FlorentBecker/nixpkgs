@@ -46,9 +46,9 @@ in stdenv.mkDerivation (args // {
     # irrelevant
 
     cat <<EOF > deps/config
-    [registry]
-    index = "file:///dev/null"
-    EOF
+[registry]
+index = "file:///dev/null"
+EOF
 
     export CARGO_HOME="$(realpath deps)"
     export RUST_LOG=${logLevel}

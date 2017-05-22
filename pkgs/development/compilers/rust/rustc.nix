@@ -1,6 +1,6 @@
 { stdenv, fetchurl, fetchgit, fetchzip, file, python2, tzdata, procps
 , llvm, jemalloc, ncurses, darwin, binutils, rustPlatform, git, cmake, curl
-
+, cacert, tree
 , isRelease ? false
 , shortVersion
 , forceBundledLLVM ? false
@@ -25,12 +25,26 @@ let
   llvmShared = llvm.override { enableSharedLibraries = true; };
 
   target = builtins.replaceStrings [" "] [","] (builtins.toString targets);
+  
+  src = fetchgit {
+    url = https://github.com/rust-lang/rust;
+    rev = srcRev;
+    sha256 = srcSha;
+  };
 
-in
+  name = "rustc-${version}";
+
+  sourceRoot = "rust-56124ba";
+
+  cargo_exe = "${rustPlatform.rust.cargo}/bin/cargo";
+
+  inherit (rustPlatform) rustRegistry;
+  
+  in
 
 stdenv.mkDerivation {
-  name = "rustc-${version}";
-  inherit version;
+
+  inherit version name src sourceRoot;
 
   __impureHostDeps = [ "/usr/lib/libedit.3.dylib" ];
 
@@ -45,19 +59,12 @@ stdenv.mkDerivation {
   # Increase codegen units to introduce parallelism within the compiler.
   RUSTFLAGS = "-Ccodegen-units=10";
 
-  src = fetchgit {
-    url = https://github.com/rust-lang/rust;
-    rev = srcRev;
-    sha256 = srcSha;
-  };
-
   # We need rust to build rust. If we don't provide it, configure will try to download it.
   configureFlags = configureFlags
                 ++ [ "--enable-local-rust" "--local-rust-root=${rustPlatform.rust.rustc}" "--enable-rpath" ]
+                ++ [ "--enable-local-cargo" "--local-cargo-root=${rustPlatform.rust.cargo}" ]
                 # ++ [ "--jemalloc-root=${jemalloc}/lib"
                 ++ [ "--default-linker=${stdenv.cc}/bin/cc" "--default-ar=${binutils.out}/bin/ar" ]
-                # TODO: Remove when fixed build with rustbuild
-                ++ [ "--disable-rustbuild" ]
                 ++ optional (stdenv.cc.cc ? isClang) "--enable-clang"
                 ++ optional (targets != []) "--target=${target}"
                 ++ optional (!forceBundledLLVM) "--llvm-root=${llvmShared}";
@@ -66,6 +73,59 @@ stdenv.mkDerivation {
 
   passthru.target = target;
 
+  cargoDeps = rustPlatform.fetchCargo {
+    inherit name src;
+
+    sourceRoot = "${sourceRoot}/src";
+    srcs = null;
+    sha256 = "0nywf7rcgdi7857qj10c04g9r8shzrgswdq99x1al3wc0y3jzjri";
+  };
+
+  postUnpack = ''
+    echo "Using cargo deps from $cargoDeps"
+
+    cp -a "$cargoDeps" deps
+    chmod +w deps -R
+
+    # It's OK to use /dev/null as the URL because by the time we do this, cargo
+    # won't attempt to update the registry anymore, so the URL is more or less
+    # irrelevant
+
+    cat <<EOF > deps/config
+[registry]
+index = "file:///dev/null"
+EOF
+
+    export CARGO_HOME="$(realpath deps)"
+    export SSL_CERT_FILE=${cacert}/etc/ssl/certs/ca-bundle.crt
+
+    # Let's find out which $indexHash cargo uses for file:///dev/null
+    (cd $sourceRoot/src && cargo fetch &>/dev/null) || true
+    cd deps
+    indexHash="$(basename $(echo registry/index/*))"
+
+    echo "Using indexHash '$indexHash'"
+
+    rm -rf -- "registry/cache/$indexHash" \
+              "registry/index/$indexHash"
+
+    mv registry/cache/HASH "registry/cache/$indexHash"
+
+    echo "Using rust registry from ${rustRegistry}"
+    ln -s "${rustRegistry}" "registry/index/$indexHash"
+
+    # Retrieved the Cargo.lock file which we saved during the fetch
+    cd ..
+    mv deps/Cargo.lock $sourceRoot/src
+
+    (
+        cd $sourceRoot/src
+
+        cargo fetch
+        cargo clean
+    )
+  '';
+  
   postPatch = ''
     substituteInPlace src/rust-installer/gen-install-script.sh \
       --replace /bin/echo "$(type -P echo)"
@@ -73,11 +133,11 @@ stdenv.mkDerivation {
       --replace /bin/echo "$(type -P echo)"
 
     # Workaround for NixOS/nixpkgs#8676
-    substituteInPlace mk/rustllvm.mk \
-      --replace "\$\$(subst  /,//," "\$\$(subst /,/,"
+    #substituteInPlace mk/rustllvm.mk \
+    #  --replace "\$\$(subst  /,//," "\$\$(subst /,/,"
 
     # Fix dynamic linking against llvm
-    ${optionalString (!forceBundledLLVM) ''sed -i 's/, kind = \\"static\\"//g' src/etc/mklldeps.py''}
+    # ${optionalString (!forceBundledLLVM) ''sed -i 's/, kind = \\"static\\"//g' src/etc/mklldeps.py''}
 
     # Fix the configure script to not require curl as we won't use it
     sed -i configure \
@@ -117,17 +177,17 @@ stdenv.mkDerivation {
 
   # rustc unfortunately need cmake for compiling llvm-rt but doesn't
   # use it for the normal build. This disables cmake in Nix.
-  dontUseCmakeConfigure = true;
+  # dontUseCmakeConfigure = true;
 
   # ps is needed for one of the test cases
-  nativeBuildInputs = [ file python2 procps rustPlatform.rust.rustc git cmake ];
+  nativeBuildInputs = [ file python2 procps rustPlatform.rust.rustc rustPlatform.rust.cargo git tree ];
 
   buildInputs = [ ncurses ] ++ targetToolchains
     ++ optional (!forceBundledLLVM) llvmShared;
 
   outputs = [ "out" "doc" ];
   setOutputFlags = false;
-
+  
   # Disable codegen units for the tests.
   preCheck = ''
     export RUSTFLAGS=

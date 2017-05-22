@@ -1,0 +1,78 @@
+diff -ru rust-56124ba/configure rust-56124ba.old/configure
+--- rust-56124ba/configure	1970-01-01 01:00:01.000000000 +0100
++++ rust-56124ba.old/configure	2017-05-22 10:37:50.959257635 +0200
+@@ -434,6 +434,7 @@
+ opt ccache 0 "invoke gcc/clang via ccache to reuse object files between builds"
+ opt sccache 0 "invoke gcc/clang via sccache to reuse object files between builds"
+ opt local-rust 0 "use an installed rustc rather than downloading a snapshot"
++opt local-cargo 0 "use an installed cargo rather than downloading a snapshot"
+ opt local-rebuild 0 "assume local-rust matches the current version, for rebuilds; implies local-rust, and is implied if local-rust already matches the current version"
+ opt llvm-static-stdcpp 0 "statically link to libstdc++ for LLVM"
+ opt llvm-link-shared 0 "prefer shared linking to LLVM (llvm-config --link-shared)"
+@@ -515,6 +516,7 @@
+ 
+ valopt_nosave prefix "/usr/local" "set installation prefix"
+ valopt_nosave local-rust-root "/usr/local" "set prefix for local rust binary"
++valopt_nosave local-cargo-root "/usr/local" "set prefix for local cargo binary"
+ valopt_nosave host "${CFG_BUILD}" "GNUs ./configure syntax LLVM host triples"
+ valopt_nosave target "${CFG_HOST}" "GNUs ./configure syntax LLVM target triples"
+ valopt_nosave mandir "${CFG_PREFIX}/share/man" "install man pages in PATH"
+@@ -688,6 +690,33 @@
+     putvar CFG_LOCAL_RUST_ROOT
+ fi
+ 
++
++if [ -n "$CFG_ENABLE_LOCAL_CARGO" ]
++then
++    system_cargo=$(which cargo)
++    if [ -f ${CFG_LOCAL_CARGO_ROOT}/bin/cargo${BIN_SUF} ]
++    then
++        : # everything already configured
++    elif [ -n "$system_cargo" ]
++    then
++        # we assume that cargo is in a /bin directory
++        CFG_LOCAL_CARGO_ROOT=${system_cargo%/bin/}
++    else
++        err "no local cargo to use"
++    fi
++
++    CMD="${CFG_LOCAL_CARGO_ROOT}/bin/cargo${BIN_SUF}"
++    LRV=`LD_LIBRARY_PATH=${CFG_LOCAL_RUST_ROOT}/lib $CMD --version`
++    if [ $? -ne 0 ]
++    then
++        step_msg "failure while running $CMD --version"
++        exit 1
++    fi
++    step_msg "using cargo at: ${CFG_LOCAL_CARGO_ROOT} with version: $LRV"
++    putvar CFG_LOCAL_CARGO_ROOT
++fi
++
++
+ # Same with jemalloc.  save the setting here.
+ if [ -n "$CFG_DISABLE_JEMALLOC" ]
+ then
+diff -ru rust-56124ba/src/bootstrap/bootstrap.py rust-56124ba.old/src/bootstrap/bootstrap.py
+--- rust-56124ba/src/bootstrap/bootstrap.py	1970-01-01 01:00:01.000000000 +0100
++++ rust-56124ba.old/src/bootstrap/bootstrap.py	2017-05-22 10:37:11.278099409 +0200
+@@ -306,7 +306,7 @@
+         config = self.get_toml('cargo')
+         if config:
+             return config
+-        config = self.get_mk('CFG_LOCAL_RUST_ROOT')
++        config = self.get_mk('CFG_LOCAL_CARGO_ROOT')
+         if config:
+             return config + '/bin/cargo' + self.exe_suffix()
+         return os.path.join(self.bin_root(), "bin/cargo" + self.exe_suffix())
+--- a/src/bootstrap/config.rs
++++ b/src/bootstrap/config.rs
+@@ -573,6 +573,9 @@ impl Config {
+                 "CFG_LOCAL_RUST_ROOT" if value.len() > 0 => {
+                     let path = parse_configure_path(value);
+                     self.rustc = Some(push_exe_path(path.clone(), &["bin", "rustc"]));
++                }
++                "CFG_LOCAL_CARGO_ROOT" if value.len() > 0 => {
++                    let path = parse_configure_path(value);
+                     self.cargo = Some(push_exe_path(path, &["bin", "cargo"]));
+                 }
+                 "CFG_PYTHON" if value.len() > 0 => {
+
