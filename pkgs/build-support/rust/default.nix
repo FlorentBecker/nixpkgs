@@ -1,4 +1,4 @@
-{ stdenv, cacert, git, rust, rustRegistry }:
+{ stdenv, cacert, git, rust, rustRegistry, fetchCargo }:
 { name, depsSha256
 , src ? null
 , srcs ? null
@@ -11,11 +11,11 @@
 , ... } @ args:
 
 let
-  fetchDeps = import ./fetchcargo.nix {
-    inherit stdenv cacert git rust rustRegistry;
-  };
+  # fetchDeps = import ./fetchcargo.nix {
+  #   inherit stdenv cacert git rust rustRegistry;
+  # };
 
-  cargoDeps = fetchDeps {
+  cargoDeps = fetchCargo {
     inherit name src srcs sourceRoot cargoUpdateHook;
     sha256 = depsSha256;
   };

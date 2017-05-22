@@ -5725,13 +5725,17 @@ with pkgs;
   makeRustPlatform = rust: lib.fix (self:
     let
       callPackage = newScope self;
-    in {
+
+      fetchCargo = callPackage ../build-support/rust/fetchcargo.nix { };
+    in rec {
       inherit rust;
 
       rustRegistry = callPackage ./rust-packages.nix { };
 
+      inherit fetchCargo;
+
       buildRustPackage = callPackage ../build-support/rust {
-        inherit rust;
+        inherit rust fetchCargo;
       };
     });
 
