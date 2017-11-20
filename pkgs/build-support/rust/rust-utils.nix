@@ -68,30 +68,63 @@ let buildCrate = { crateName, crateVersion, buildDependencies, dependencies,
 	$@
       }
 
+
+      symlink_dependency() {
+      # $1 is the nix-store path of a dependency
+        i=$1
+	dest=target/deps
+	if [ ! -z $2 ]; then
+	   if [ "$2" = "--buildDep" ]; then
+             dest=target/buildDeps
+	   fi
+	fi
+        ln -s -f $i/rlibs/*.rlib $dest #*/
+        ln -s -f $i/rlibs/*.so $i/rlibs/*.dylib $dest #*/
+        if [ -e "$i/rlibs/link" ]; then
+            cat $i/rlibs/link >> target/link
+            cat $i/rlibs/link >> target/link.final
+        fi
+        if [ -e $i/env ]; then
+            source $i/env
+        fi
+      }
+
+      build_lib() {
+         lib_src=$1
+	 echo_build_heading $lib_src ${libName}
+
+	 noisily rustc --crate-name $CRATE_NAME $lib_src --crate-type ${crateType} \
+           ${rustcOpts} ${rustcMeta} ${crateFeatures} --out-dir target/lib \
+           --emit=dep-info,link -L dependency=target/deps ${deps} --cap-lints allow \
+           $BUILD_OUT_DIR $EXTRA_BUILD $EXTRA_FEATURES --color ${colors}
+
+	 EXTRA_LIB=" --extern $CRATE_NAME=target/lib/lib$CRATE_NAME-${metadata}.rlib"
+         if [ -e target/deps/lib$CRATE_NAME-${metadata}${buildPlatform.extensions.sharedLibrary} ]; then
+            EXTRA_LIB="$EXTRA_LIB --extern $CRATE_NAME=target/lib/lib$CRATE_NAME-${metadata}${buildPlatform.extensions.sharedLibrary}"
+         fi
+      }
+
+      build_bin() {
+        crate_name=$1
+	main_file=""
+	if [ ! -z $2 ]; then
+	  main_file=$2
+	fi
+	echo_build_heading $@
+	noisily rustc --crate-name $crate_name $main_file --crate-type bin ${rustcOpts}\
+	  ${crateFeatures} --out-dir target/bin --emit=dep-info,link -L dependency=target/deps \
+          $LINK ${deps}$EXTRA_LIB --cap-lints allow \
+          $BUILD_OUT_DIR $EXTRA_BUILD $EXTRA_FEATURES --color ${colors}
+      }
+
       runHook preBuild
       mkdir -p target/{deps,lib,build,buildDeps}
-
       chmod uga+w target -R
       for i in ${completeDepsDir}; do
-         ln -s -f $i/*.rlib target/deps #*/
-         ln -s -f $i/*.so $i/*.dylib target/deps #*/
-         if [ -e "$i/link" ]; then
-            cat $i/link >> target/link
-            cat $i/link >> target/link.final
-         fi
-         if [ -e $i/env ]; then
-            source $i/env
-         fi
+        symlink_dependency $i
       done
       for i in ${completeBuildDepsDir}; do
-         ln -s -f $i/*.rlib target/buildDeps #*/
-         ln -s -f $i/*.so $i/*.dylib target/buildDeps #*/
-         if [ -e "$i/link" ]; then
-            cat $i/link >> target/link.build
-         fi
-         if [ -e $i/env ]; then
-            source $i/env
-         fi
+         symlink_dependency $i --buildDep
       done
       if [ -e target/link ]; then
         sort -u target/link > target/link.sorted
@@ -177,41 +210,11 @@ let buildCrate = { crateName, crateVersion, buildDependencies, dependencies,
       fi
 
       if [ -e "${libPath}" ] ; then
-         noisily rustc --crate-name $CRATE_NAME ${libPath} --crate-type ${crateType} \
-           ${rustcOpts} ${rustcMeta} ${crateFeatures} --out-dir target/lib \
-           --emit=dep-info,link -L dependency=target/deps ${deps} --cap-lints allow \
-           $BUILD_OUT_DIR $EXTRA_BUILD $EXTRA_FEATURES --color ${colors}
-
-         EXTRA_LIB=" --extern $CRATE_NAME=target/lib/lib$CRATE_NAME-${metadata}.rlib"
-         if [ -e target/deps/lib$CRATE_NAME-${metadata}${buildPlatform.extensions.sharedLibrary} ]; then
-            EXTRA_LIB="$EXTRA_LIB --extern $CRATE_NAME=target/lib/lib$CRATE_NAME-${metadata}${buildPlatform.extensions.sharedLibrary}"
-         fi
+         build_lib ${libPath}
       elif [ -e src/lib.rs ] ; then
-         echo_build_heading src/lib.rs ${libName}
-
-         noisily rustc --crate-name $CRATE_NAME src/lib.rs --crate-type ${crateType} \
-           ${rustcOpts} ${rustcMeta} ${crateFeatures} --out-dir target/lib \
-           --emit=dep-info,link -L dependency=target/deps ${deps} --cap-lints allow \
-           $BUILD_OUT_DIR $EXTRA_BUILD $EXTRA_FEATURES --color ${colors}
-
-         EXTRA_LIB=" --extern $CRATE_NAME=target/lib/lib$CRATE_NAME-${metadata}.rlib"
-         if [ -e target/deps/lib$CRATE_NAME-${metadata}${buildPlatform.extensions.sharedLibrary} ]; then
-            EXTRA_LIB="$EXTRA_LIB --extern $CRATE_NAME=target/lib/lib$CRATE_NAME-${metadata}${buildPlatform.extensions.sharedLibrary}"
-         fi
-
+         build_lib src/lib.rs
       elif [ -e src/${libName}.rs ] ; then
-
-         echo_build_heading "src/${libName}.rs"
-         noisily rustc --crate-name $CRATE_NAME src/${libName}.rs --crate-type ${crateType} \
-           ${rustcOpts} ${rustcMeta} ${crateFeatures} --out-dir target/lib \
-           --emit=dep-info,link -L dependency=target/deps ${deps} --cap-lints allow \
-           $BUILD_OUT_DIR $EXTRA_BUILD $EXTRA_FEATURES --color ${colors}
-
-         EXTRA_LIB=" --extern $CRATE_NAME=target/lib/lib$CRATE_NAME-${metadata}.rlib"
-         if [ -e target/lib/lib$CRATE_NAME-${metadata}${buildPlatform.extensions.sharedLibrary} ]; then
-            EXTRA_LIB="$EXTRA_LIB --extern $CRATE_NAME=target/lib/lib$CRATE_NAME-${metadata}${buildPlatform.extensions.sharedLibrary}"
-         fi
-
+         build_lib src/${libName}.rs
       fi
 
       echo "$EXTRA_LINK_SEARCH" | while read i; do
@@ -245,19 +248,11 @@ let buildCrate = { crateName, crateVersion, buildDependencies, dependencies,
       mkdir -p target/bin
       echo "${crateBin}" | sed -n 1'p' | tr ',' '\n' | while read BIN; do
          if [ ! -z "$BIN" ]; then
-           echo_build_heading $BIN
-           noisily rustc --crate-name $BIN --crate-type bin ${rustcOpts} ${crateFeatures} \
-             --out-dir target/bin --emit=dep-info,link -L dependency=target/deps \
-             $LINK ${deps}$EXTRA_LIB --cap-lints allow \
-             $BUILD_OUT_DIR $EXTRA_BUILD $EXTRA_FEATURES --color ${colors}
+	   build_bin $BIN
          fi
       done
       if [[ (-z "${crateBin}") && (-e src/main.rs) ]]; then
-         echo_build_heading src/main.rs ${crateName}
-	 noisily rustc --crate-name $CRATE_NAME src/main.rs --crate-type bin ${rustcOpts} \
-           ${crateFeatures} --out-dir target/bin --emit=dep-info,link \
-           -L dependency=target/deps $LINK ${deps}$EXTRA_LIB --cap-lints allow \
-           $BUILD_OUT_DIR $EXTRA_BUILD $EXTRA_FEATURES --color ${colors}
+         build_bin ${crateName} src/main.rs
       fi
       # Remove object files to avoid "wrong ELF type"
       find target -type f -name "*.o" -print0 | xargs -0 rm -f
