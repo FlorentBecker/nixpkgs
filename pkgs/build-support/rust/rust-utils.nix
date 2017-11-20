@@ -160,9 +160,9 @@ let buildCrate = { crateName, crateVersion, buildDependencies, dependencies,
            --emit=dep-info,link -L dependency=target/deps ${deps} --cap-lints allow \
            $BUILD_OUT_DIR $EXTRA_BUILD $EXTRA_FEATURES --color ${colors}
 
-         EXTRA_LIB=" --extern $CRATE_NAME=target/deps/lib$CRATE_NAME-${metadata}.rlib"
+         EXTRA_LIB=" --extern $CRATE_NAME=target/lib/lib$CRATE_NAME-${metadata}.rlib"
          if [ -e target/deps/lib$CRATE_NAME-${metadata}${buildPlatform.extensions.sharedLibrary} ]; then
-            EXTRA_LIB="$EXTRA_LIB --extern $CRATE_NAME=target/deps/lib$CRATE_NAME-${metadata}${buildPlatform.extensions.sharedLibrary}"
+            EXTRA_LIB="$EXTRA_LIB --extern $CRATE_NAME=target/lib/lib$CRATE_NAME-${metadata}${buildPlatform.extensions.sharedLibrary}"
          fi
       elif [ -e src/lib.rs ] ; then
 
@@ -176,9 +176,9 @@ let buildCrate = { crateName, crateVersion, buildDependencies, dependencies,
            --emit=dep-info,link -L dependency=target/deps ${deps} --cap-lints allow \
            $BUILD_OUT_DIR $EXTRA_BUILD $EXTRA_FEATURES --color ${colors}
 
-         EXTRA_LIB=" --extern $CRATE_NAME=target/deps/lib$CRATE_NAME-${metadata}.rlib"
+         EXTRA_LIB=" --extern $CRATE_NAME=target/lib/lib$CRATE_NAME-${metadata}.rlib"
          if [ -e target/deps/lib$CRATE_NAME-${metadata}${buildPlatform.extensions.sharedLibrary} ]; then
-            EXTRA_LIB="$EXTRA_LIB --extern $CRATE_NAME=target/deps/lib$CRATE_NAME-${metadata}${buildPlatform.extensions.sharedLibrary}"
+            EXTRA_LIB="$EXTRA_LIB --extern $CRATE_NAME=target/lib/lib$CRATE_NAME-${metadata}${buildPlatform.extensions.sharedLibrary}"
          fi
 
       elif [ -e src/${libName}.rs ] ; then
@@ -192,9 +192,9 @@ let buildCrate = { crateName, crateVersion, buildDependencies, dependencies,
            --emit=dep-info,link -L dependency=target/deps ${deps} --cap-lints allow \
            $BUILD_OUT_DIR $EXTRA_BUILD $EXTRA_FEATURES --color ${colors}
 
-         EXTRA_LIB=" --extern $CRATE_NAME=target/deps/lib$CRATE_NAME-${metadata}.rlib"
-         if [ -e target/deps/lib$CRATE_NAME-${metadata}${buildPlatform.extensions.sharedLibrary} ]; then
-            EXTRA_LIB="$EXTRA_LIB --extern $CRATE_NAME=target/deps/lib$CRATE_NAME-${metadata}${buildPlatform.extensions.sharedLibrary}"
+         EXTRA_LIB=" --extern $CRATE_NAME=target/lib/lib$CRATE_NAME-${metadata}.rlib"
+         if [ -e target/lib/lib$CRATE_NAME-${metadata}${buildPlatform.extensions.sharedLibrary} ]; then
+            EXTRA_LIB="$EXTRA_LIB --extern $CRATE_NAME=target/lib/lib$CRATE_NAME-${metadata}${buildPlatform.extensions.sharedLibrary}"
          fi
 
       fi
