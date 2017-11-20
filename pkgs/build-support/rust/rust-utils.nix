@@ -294,8 +294,8 @@ crate: lib.makeOverridable ({ rust, release, verbose }: stdenv.mkDerivation rec 
         (dep: dep.override { rust = rust; release = release; verbose = verbose; })
         (lib.attrByPath ["buildDependencies"] [] crate);
 
-    completeDeps = builtins.foldl' (comp: dep: if lib.lists.any (x: x == comp) dep.completeDeps then comp ++ dep.complete else comp) dependencies dependencies;
-    completeBuildDeps = builtins.foldl' (comp: dep: if lib.lists.any (x: x == comp) dep.completeBuildDeps then comp ++ dep.complete else comp) buildDependencies buildDependencies;
+    completeDeps = lib.lists.unique (dependencies ++ lib.lists.concatMap (dep: dep.completeDeps) dependencies);
+    completeBuildDeps = lib.lists.unique (buildDependencies ++ lib.lists.concatMap (dep: dep.completeDeps) buildDependencies);
 
     crateFeatures = if crate ? features then
        lib.concatMapStringsSep " " (f: "--cfg feature=\\\"${f}\\\"") crate.features
