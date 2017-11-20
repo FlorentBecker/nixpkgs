@@ -39,9 +39,38 @@ let buildCrate = { crateName, crateVersion, buildDependencies, dependencies,
         green="$(printf '\033[0;32m')" #set green
         boldgreen="$(printf '\033[0;1;32m')" #set bold, and set green.
       fi
-      mkdir -p target/deps
-      mkdir -p target/build
-      mkdir -p target/buildDeps
+
+      echo_build_heading() {
+       start=""
+       end=""
+       if [[ x"${colors}" -eq x"always" ]]; then
+	 start="$(printf '\033[0;1;32m')" #set bold, and set green.
+         end="$(printf '\033[0m')" #returns to "normal"
+       fi
+       if (( $# == 1 )); then
+         echo "$start""Building $1""$end"
+       else
+         echo "$start""Building $1 ($2)""$end"
+       fi
+      }
+
+      noisily() {
+        start=""
+        end=""
+        if [[ x"${colors}" -eq x"always" ]]; then
+	  start="$(printf '\033[0;1;32m')" #set bold, and set green.
+          end="$(printf '\033[0m')" #returns to "normal"
+        fi
+	${lib.optionalString verbose ''
+	    echo -n "$start"Running "$end"
+	    echo $@
+	''}
+	$@
+      }
+
+      runHook preBuild
+      mkdir -p target/{deps,lib,build,buildDeps}
+
       chmod uga+w target -R
       for i in ${completeDepsDir}; do
          ln -s -f $i/*.rlib target/deps #*/
@@ -102,7 +131,7 @@ let buildCrate = { crateName, crateVersion, buildDependencies, dependencies,
          BUILD="build.rs"
       fi
       if [[ ! -z "$BUILD" ]] ; then
-         echo "$boldgreen""Building $BUILD (${libName})""$norm"
+         echo_build_heading "$BUILD" ${libName}
          mkdir -p target/build/${crateName}
          EXTRA_BUILD_FLAGS=""
          if [ -e target/link_ ]; then
@@ -111,12 +140,9 @@ let buildCrate = { crateName, crateVersion, buildDependencies, dependencies,
          if [ -e target/link.build ]; then
            EXTRA_BUILD_FLAGS="$EXTRA_BUILD_FLAGS $(cat target/link.build)"
          fi
-         if ${toString verbose}; then
-           echo $boldgreen""Running$norm rustc --crate-name build_script_build $BUILD --crate-type bin ${rustcOpts} ${crateFeatures} --out-dir target/build/${crateName} --emit=dep-info,link -L dependency=target/buildDeps ${buildDeps} --cap-lints allow $EXTRA_BUILD_FLAGS
-         fi
-         rustc --crate-name build_script_build $BUILD --crate-type bin ${rustcOpts} \
-           ${crateFeatures} --out-dir target/build/${crateName} --emit=dep-info,link \
-           -L dependency=target/buildDeps ${buildDeps} --cap-lints allow $EXTRA_BUILD_FLAGS --color ${colors}
+         noisily rustc --crate-name build_script_build $BUILD --crate-type bin ${rustcOpts} \
+          ${crateFeatures} --out-dir target/build/${crateName} --emit=dep-info,link \
+          -L dependency=target/buildDeps ${buildDeps} --cap-lints allow $EXTRA_BUILD_FLAGS --color ${colors}
 
          mkdir -p target/build/${crateName}.out
          export RUST_BACKTRACE=1
@@ -151,12 +177,8 @@ let buildCrate = { crateName, crateVersion, buildDependencies, dependencies,
       fi
 
       if [ -e "${libPath}" ] ; then
-
-         if ${toString verbose}; then
-           echo $boldgreen""Building ${libPath}$norm rustc --crate-name $CRATE_NAME ${libPath} --crate-type ${crateType} ${rustcOpts} ${rustcMeta} ${crateFeatures} --out-dir target/deps --emit=dep-info,link -L dependency=target/deps ${deps} --cap-lints allow $BUILD_OUT_DIR $EXTRA_BUILD $EXTRA_FEATURES
-         fi
-         rustc --crate-name $CRATE_NAME ${libPath} --crate-type ${crateType} \
-           ${rustcOpts} ${rustcMeta} ${crateFeatures} --out-dir target/deps \
+         noisily rustc --crate-name $CRATE_NAME ${libPath} --crate-type ${crateType} \
+           ${rustcOpts} ${rustcMeta} ${crateFeatures} --out-dir target/lib \
            --emit=dep-info,link -L dependency=target/deps ${deps} --cap-lints allow \
            $BUILD_OUT_DIR $EXTRA_BUILD $EXTRA_FEATURES --color ${colors}
 
@@ -165,14 +187,10 @@ let buildCrate = { crateName, crateVersion, buildDependencies, dependencies,
             EXTRA_LIB="$EXTRA_LIB --extern $CRATE_NAME=target/lib/lib$CRATE_NAME-${metadata}${buildPlatform.extensions.sharedLibrary}"
          fi
       elif [ -e src/lib.rs ] ; then
+         echo_build_heading src/lib.rs ${libName}
 
-         echo "$boldgreen""Building src/lib.rs (${libName})""$norm"
-
-         if ${toString verbose}; then
-           echo $boldgreen""Running$norm rustc --crate-name $CRATE_NAME src/lib.rs --crate-type ${crateType} ${rustcOpts} ${rustcMeta} ${crateFeatures} --out-dir target/deps --emit=dep-info,link -L dependency=target/deps ${deps} --cap-lints allow $BUILD_OUT_DIR $EXTRA_BUILD $EXTRA_FEATURES
-         fi
-         rustc --crate-name $CRATE_NAME src/lib.rs --crate-type ${crateType} \
-           ${rustcOpts} ${rustcMeta} ${crateFeatures} --out-dir target/deps \
+         noisily rustc --crate-name $CRATE_NAME src/lib.rs --crate-type ${crateType} \
+           ${rustcOpts} ${rustcMeta} ${crateFeatures} --out-dir target/lib \
            --emit=dep-info,link -L dependency=target/deps ${deps} --cap-lints allow \
            $BUILD_OUT_DIR $EXTRA_BUILD $EXTRA_FEATURES --color ${colors}
 
@@ -183,12 +201,9 @@ let buildCrate = { crateName, crateVersion, buildDependencies, dependencies,
 
       elif [ -e src/${libName}.rs ] ; then
 
-         echo "$boldgreen""Building src/${libName}.rs""$norm"
-         if ${toString verbose}; then
-           echo $boldgreen""Running$norm rustc --crate-name $CRATE_NAME src/${libName}.rs --crate-type ${crateType} ${rustcOpts} ${rustcMeta} ${crateFeatures} --out-dir target/deps --emit=dep-info,link -L dependency=target/deps ${deps} --cap-lints allow $BUILD_OUT_DIR $EXTRA_BUILD $EXTRA_FEATURES
-         fi
-         rustc --crate-name $CRATE_NAME src/${libName}.rs --crate-type ${crateType} \
-           ${rustcOpts} ${rustcMeta} ${crateFeatures} --out-dir target/deps \
+         echo_build_heading "src/${libName}.rs"
+         noisily rustc --crate-name $CRATE_NAME src/${libName}.rs --crate-type ${crateType} \
+           ${rustcOpts} ${rustcMeta} ${crateFeatures} --out-dir target/lib \
            --emit=dep-info,link -L dependency=target/deps ${deps} --cap-lints allow \
            $BUILD_OUT_DIR $EXTRA_BUILD $EXTRA_FEATURES --color ${colors}
 
@@ -230,22 +245,16 @@ let buildCrate = { crateName, crateVersion, buildDependencies, dependencies,
       mkdir -p target/bin
       echo "${crateBin}" | sed -n 1'p' | tr ',' '\n' | while read BIN; do
          if [ ! -z "$BIN" ]; then
-           echo "$boldgreen""Building $BIN$norm"
-           if ${toString verbose}; then
-             echo "$boldgreen""Running$norm rustc --crate-name $BIN --crate-type bin ${rustcOpts} ${crateFeatures} --out-dir target/bin --emit=dep-info,link -L dependency=target/deps $LINK ${deps}$EXTRA_LIB --cap-lints allow $BUILD_OUT_DIR $EXTRA_BUILD $EXTRA_FEATURES"
-           fi
-           rustc --crate-name $BIN --crate-type bin ${rustcOpts} ${crateFeatures} \
+           echo_build_heading $BIN
+           noisily rustc --crate-name $BIN --crate-type bin ${rustcOpts} ${crateFeatures} \
              --out-dir target/bin --emit=dep-info,link -L dependency=target/deps \
              $LINK ${deps}$EXTRA_LIB --cap-lints allow \
              $BUILD_OUT_DIR $EXTRA_BUILD $EXTRA_FEATURES --color ${colors}
          fi
       done
       if [[ (-z "${crateBin}") && (-e src/main.rs) ]]; then
-         echo "$boldgreen""Building src/main.rs (${crateName})$norm"
-         if ${toString verbose}; then
-           echo "$boldgreen""Running$norm rustc --crate-name $CRATE_NAME src/main.rs --crate-type bin ${rustcOpts} ${crateFeatures} --out-dir target/bin --emit=dep-info,link -L dependency=target/deps $LINK ${deps}$EXTRA_LIB --cap-lints allow $BUILD_OUT_DIR $EXTRA_BUILD $EXTRA_FEATURES"
-         fi
-         rustc --crate-name $CRATE_NAME src/main.rs --crate-type bin ${rustcOpts} \
+         echo_build_heading src/main.rs ${crateName}
+	 noisily rustc --crate-name $CRATE_NAME src/main.rs --crate-type bin ${rustcOpts} \
            ${crateFeatures} --out-dir target/bin --emit=dep-info,link \
            -L dependency=target/deps $LINK ${deps}$EXTRA_LIB --cap-lints allow \
            $BUILD_OUT_DIR $EXTRA_BUILD $EXTRA_FEATURES --color ${colors}
