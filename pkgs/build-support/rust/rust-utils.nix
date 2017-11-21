@@ -269,6 +269,9 @@ let buildCrate = { crateName, crateVersion, buildDependencies, dependencies,
       if [ "$(ls -A target/deps)" ]; then
       cp target/deps/* $out # */
       fi
+      if [ "$(ls -A target/lib)" ]; then
+      cp target/lib/* $out # */
+      fi
       if [ "$(ls -A target/build)" ]; then
         cp -r target/build/* $out # */
       fi
