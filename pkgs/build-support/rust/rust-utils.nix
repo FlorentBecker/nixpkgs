@@ -19,9 +19,9 @@ let buildCrate = { crateName, crateVersion, buildDependencies, dependencies,
             (lib.concatMapStringsSep " " (dep:
               let extern = lib.strings.replaceStrings ["-"] ["_"] dep.libName; in
               (if dep.crateType == "lib" then
-                 " --extern ${extern}=${dep.out}/lib${extern}-${dep.metadata}.rlib"
+                 " --extern ${extern}=${dep.out}/lib/lib${extern}-${dep.metadata}.rlib"
               else
-                 " --extern ${extern}=${dep.out}/lib${extern}-${dep.metadata}${buildPlatform.extensions.sharedLibrary}")
+                 " --extern ${extern}=${dep.out}/lib/lib${extern}-${dep.metadata}${buildPlatform.extensions.sharedLibrary}")
             ) dependencies);
           deps = makeDeps dependencies;
           buildDeps = makeDeps buildDependencies;
@@ -68,7 +68,6 @@ let buildCrate = { crateName, crateVersion, buildDependencies, dependencies,
 	$@
       }
 
-
       symlink_dependency() {
       # $1 is the nix-store path of a dependency
         i=$1
@@ -78,11 +77,11 @@ let buildCrate = { crateName, crateVersion, buildDependencies, dependencies,
              dest=target/buildDeps
 	   fi
 	fi
-        ln -s -f $i/rlibs/*.rlib $dest #*/
-        ln -s -f $i/rlibs/*.so $i/rlibs/*.dylib $dest #*/
-        if [ -e "$i/rlibs/link" ]; then
-            cat $i/rlibs/link >> target/link
-            cat $i/rlibs/link >> target/link.final
+        ln -s -f $i/lib/*.rlib $dest #*/
+        ln -s -f $i/lib/*.so $i/lib/*.dylib $dest #*/
+        if [ -e "$i/lib/link" ]; then
+            cat $i/lib/link >> target/link
+            cat $i/lib/link >> target/link.final
         fi
         if [ -e $i/env ]; then
             source $i/env
@@ -264,13 +263,15 @@ let buildCrate = { crateName, crateVersion, buildDependencies, dependencies,
         cp target/env $out/env
       fi
       if [ -s target/link.final ]; then
-        cp target/link.final $out/link
+        mkdir -p $out/lib
+        cp target/link.final $out/lib/link
       fi
-      if [ "$(ls -A target/deps)" ]; then
-      cp target/deps/* $out # */
-      fi
+      # if [ "$(ls -A target/deps)" ]; then
+      # cp target/deps/* $out # */
+      # fi
       if [ "$(ls -A target/lib)" ]; then
-      cp target/lib/* $out # */
+      mkdir -p $out/lib
+      cp target/lib/* $out/lib # */
       fi
       if [ "$(ls -A target/build)" ]; then
         cp -r target/build/* $out # */
