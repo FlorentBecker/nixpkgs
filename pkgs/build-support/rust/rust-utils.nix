@@ -266,11 +266,13 @@ let buildCrate = { crateName, crateVersion, buildDependencies, dependencies,
       if [ -s target/link.final ]; then
         cp target/link.final $out/link
       fi
+      if [ "$(ls -A target/deps)" ]; then
       cp target/deps/* $out # */
-      if [ "$(ls -A target/build)" ]; then # */
+      fi
+      if [ "$(ls -A target/build)" ]; then
         cp -r target/build/* $out # */
       fi
-      if [ "$(ls -A target/bin)" ]; then # */
+      if [ "$(ls -A target/bin)" ]; then
         mkdir -p $out/bin
         cp -P target/bin/* $out/bin # */
       fi
