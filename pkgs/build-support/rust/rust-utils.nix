@@ -284,7 +284,10 @@ let buildCrate = { crateName, crateVersion, buildDependencies, dependencies,
 
 in
 
-crate: lib.makeOverridable ({ rust, release, verbose }: stdenv.mkDerivation rec {
+crate_: lib.makeOverridable ({ rust, release, verbose, crateOverrides }:
+
+let crate = crate_ // (lib.attrByPath [ crate_.crateName ] (attr: {}) crateOverrides crate_); in
+stdenv.mkDerivation rec {
 
     inherit (crate) crateName;
 
@@ -353,4 +356,10 @@ crate: lib.makeOverridable ({ rust, release, verbose }: stdenv.mkDerivation rec 
     };
     installPhase = installCrate crateName;
 
-}) { rust = pkgs.rustc; release = true; verbose = true; }
+})
+{
+  rust = pkgs.rustc;
+  release = true;
+  verbose = true;
+  crateOverrides = import ./defaultCrateOverrides.nix { pkgs = pkgs; };
+}
